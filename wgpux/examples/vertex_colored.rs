@@ -1,0 +1,123 @@
+use anyhow::*;
+use futures::executor::block_on;
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpux::Vertex;
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Vertex)]
+struct ColoredVertex {
+    position: [f32; 2],
+    color: [f32; 4],
+}
+
+unsafe impl bytemuck::Pod for ColoredVertex {}
+unsafe impl bytemuck::Zeroable for ColoredVertex {}
+
+fn main() -> Result<()> {
+    env_logger::init();
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+    let adapter: wgpu::Adapter = block_on(instance.request_adapter(&Default::default())).unwrap();
+    let (device, queue) = block_on(adapter.request_device(&Default::default(), None))?;
+
+    let output_desc = wgpu::TextureDescriptor {
+        label: Some("Output"),
+        size: wgpu::Extent3d { width: 512, height: 512, depth: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+    };
+    let output = device.create_texture(&output_desc);
+    let output_view = output.create_view(&Default::default());
+    // let output_buffer = device.create_buffer(
+    //     &wgpu::BufferDescriptor {
+    //         label: Some("Output Buffer"),
+    //         size: 
+    //     }
+    // );
+
+    let layout = device.create_pipeline_layout(
+        &wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[],
+            push_constant_ranges: &[],
+        }
+    );
+    let vs_module = device.create_shader_module(wgpu::include_spirv!("vertex_colored.vert.spv"));
+    let fs_module = device.create_shader_module(wgpu::include_spirv!("vertex_colored.frag.spv"));
+    let pipeline = device.create_render_pipeline(
+        &wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&layout),
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
+                module: &vs_module,
+                entry_point: "main",
+            },
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                module: &fs_module,
+                entry_point: "main",
+            }),
+            rasterization_state: None,
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+            color_states: &[
+                wgpu::ColorStateDescriptor {
+                    format: output_desc.format,
+                    alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                    color_blend: wgpu::BlendDescriptor::REPLACE,
+                    write_mask: wgpu::ColorWrite::ALL,
+                }
+            ],
+            depth_stencil_state: None,
+            vertex_state: wgpu::VertexStateDescriptor {
+                index_format: wgpu::IndexFormat::Uint16,
+                vertex_buffers: &[ColoredVertex::desc()],
+            },
+            sample_count: 1,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
+        }
+    );
+    let vertices = [
+        ColoredVertex { 
+            position: [ -0.5, 0.0 ],
+            color: [ 1.0, 0.0, 0.0, 1.0 ],
+        },
+        ColoredVertex { 
+            position: [ 0.5, 0.0 ],
+            color: [ 0.0, 1.0, 0.0, 1.0 ],
+        },
+        ColoredVertex { 
+            position: [ 0.0, 0.5 ],
+            color: [ 0.0, 0.0, 1.0, 1.0 ],
+        },
+    ];
+    let vertex_buffer = device.create_buffer_init(
+        &BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsage::VERTEX,
+        }
+    );)
+
+    let mut encoder = device.create_command_encoder(&Default::default());
+    let mut pass: wgpu::RenderPass = encoder.begin_render_pass(
+        &wgpu::RenderPassDescriptor {
+            color_attachments: &[
+                wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &output_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations::default(),
+                }
+            ],
+            depth_stencil_attachment: None,
+        }
+    );
+    pass.set_pipeline(&pipeline);
+    pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+    pass.draw(0..vertices.len() as _, 0..1);
+    drop(pass);
+    queue.submit(Some(encoder.finish()));
+
+    Ok(())
+}

@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "combinations",
-    "fibonacci",
+    "wgpux",
+    "wgpux-derive",
 ]

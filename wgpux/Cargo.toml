@@ -1,0 +1,22 @@
+[package]
+name = "wgpux"
+version = "0.1.0"
+authors = ["Ben Hansen <bhbenjaminhansen@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+wgpu = "0.6"
+wgpux-derive = { version = "=0.1.0", path = "../wgpux-derive" }
+
+[dev-dependencies]
+wgpux-derive = { version = "0.1", path = "../wgpux-derive" }
+anyhow = "1.0"
+bytemuck = "1.4"
+log = "0.4"
+env_logger = "0.7"
+futures = "0.3.5"
+
+[build-dependencies]
+anyhow = "1.0"
+glob = "0.3"
+shaderc = "0.6"
