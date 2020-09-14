@@ -15,6 +15,7 @@ bytemuck = "1.4"
 log = "0.4"
 env_logger = "0.7"
 futures = "0.3.5"
+png = "0.16"
 
 [build-dependencies]
 anyhow = "1.0"
